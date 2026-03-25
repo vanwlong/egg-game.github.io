@@ -1,12 +1,13 @@
 const canvas = document.getElementById("game");
 const ctx = canvas.getContext("2d");
 
-canvas.width = 1000;
-canvas.height = 500;
+// FULL MÀN HÌNH
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
 
-// ===== MAP =====
-const ground = 350;
-const mapWidth = 3000;
+const ground = canvas.height - 100;
+const mapWidth = 4000;
+
 let cameraX = 0;
 
 // ===== PLAYER =====
@@ -17,27 +18,26 @@ let player = {
   h: 60,
   vx: 0,
   vy: 0,
-  speed: 4,
-  jump: -10,
-  gravity: 0.5,
+  speed: 5,
+  jump: -12,
+  gravity: 0.6,
   onGround: false,
   hp: 100,
   dir: 1,
   punch: 0,
-  kick: 0,
-  skill: 0
+  kick: 0
 };
 
 // ===== INPUT =====
 let keys = {};
 
+// PC
 document.onkeydown = e => {
   let k = e.key.toLowerCase();
   keys[k] = true;
 
-  if (k === "j" && player.punch <= 0) player.punch = 15;
-  if (k === "k" && player.kick <= 0) player.kick = 20;
-  if (k === "l" && player.skill <= 0) player.skill = 30;
+  if (k === "j") player.punch = 10;
+  if (k === "k") player.kick = 15;
 
   if (k === "w" && player.onGround) {
     player.vy = player.jump;
@@ -49,120 +49,128 @@ document.onkeyup = e => {
   keys[e.key.toLowerCase()] = false;
 };
 
-// ===== ENEMY =====
-let enemies = [
-  { x: 600, y: ground - 50, hp: 100 },
-  { x: 1200, y: ground - 50, hp: 100 }
-];
+// MOBILE BUTTON
+function press(key) { keys[key] = true; }
+function release(key) { keys[key] = false; }
 
-// ===== BULLET =====
-let bullets = [];
+// ===== ENEMY =====
+let enemies = [];
+let deadEnemies = [];
+
+function spawnEnemy(x) {
+  enemies.push({ x: x, y: ground - 50, hp: 50 });
+}
+
+// spawn nhiều quái
+for (let i = 500; i < 3500; i += 300) {
+  spawnEnemy(i);
+}
+
+// ===== PLATFORM =====
+let platforms = [
+  { x: 600, y: ground - 100, w: 120, h: 10 },
+  { x: 1200, y: ground - 150, w: 150, h: 10 },
+  { x: 2000, y: ground - 120, w: 150, h: 10 }
+];
 
 // ===== UPDATE =====
 function update() {
-  // trái phải
-  if (keys["a"]) {
-    player.vx = -player.speed;
-    player.dir = -1;
-  } else if (keys["d"]) {
-    player.vx = player.speed;
-    player.dir = 1;
-  } else {
-    player.vx = 0;
-  }
+  // DI CHUYỂN
+  if (keys["a"]) { player.vx = -player.speed; player.dir = -1; }
+  else if (keys["d"]) { player.vx = player.speed; player.dir = 1; }
+  else player.vx = 0;
 
-  // gravity
   player.vy += player.gravity;
 
-  // update pos
   player.x += player.vx;
   player.y += player.vy;
 
-  // giới hạn map
-  player.x = Math.max(0, Math.min(mapWidth, player.x));
-
-  // va chạm mặt đất
+  // GROUND
   if (player.y + player.h >= ground) {
     player.y = ground - player.h;
     player.vy = 0;
     player.onGround = true;
   }
 
-  // camera
+  // PLATFORM
+  platforms.forEach(p => {
+    if (
+      player.x + player.w > p.x &&
+      player.x < p.x + p.w &&
+      player.y + player.h > p.y &&
+      player.y + player.h < p.y + 20 &&
+      player.vy >= 0
+    ) {
+      player.y = p.y - player.h;
+      player.vy = 0;
+      player.onGround = true;
+    }
+  });
+
+  // CAMERA
   cameraX = player.x - canvas.width / 2;
   cameraX = Math.max(0, Math.min(mapWidth - canvas.width, cameraX));
 
-  // cooldown
+  // COOLDOWN
   if (player.punch > 0) player.punch--;
   if (player.kick > 0) player.kick--;
-  if (player.skill > 0) player.skill--;
 
-  // bắn chưởng
-  if (player.skill === 29) {
-    bullets.push({
-      x: player.x,
-      y: player.y + 20,
-      dir: player.dir
-    });
-  }
-
-  bullets.forEach(b => b.x += b.dir * 8);
-
-  // đánh quái
+  // ĐÁNH
   enemies.forEach(e => {
     let dx = Math.abs(player.x - e.x);
-    if (dx < 50 && player.punch > 10) e.hp -= 1;
-    if (dx < 50 && player.kick > 10) e.hp -= 2;
+    if (dx < 50 && player.punch > 5) e.hp -= 1;
+    if (dx < 50 && player.kick > 5) e.hp -= 2;
   });
 
-  bullets.forEach(b => {
-    enemies.forEach(e => {
-      if (Math.abs(b.x - e.x) < 30) e.hp -= 5;
-    });
+  // CHẾT + HỒI SINH
+  enemies.forEach((e, i) => {
+    if (e.hp <= 0) {
+      deadEnemies.push({ x: e.x, time: Date.now() });
+      enemies.splice(i, 1);
+    }
   });
 
-  enemies = enemies.filter(e => e.hp > 0);
+  deadEnemies.forEach((d, i) => {
+    if (Date.now() - d.time > 3000) {
+      spawnEnemy(d.x);
+      deadEnemies.splice(i, 1);
+    }
+  });
 }
 
-// ===== VẼ PLAYER (TAY CHÂN XỊN) =====
+// ===== DRAW PLAYER =====
 function drawPlayer() {
   let x = player.x - cameraX;
   let y = player.y;
 
-  let swing = Math.sin(Date.now() / 100) * 6;
+  let swing = Math.sin(Date.now() / 100) * 5;
 
-  // thân trứng
   ctx.fillStyle = "white";
   ctx.beginPath();
   ctx.ellipse(x + 20, y + 30, 18, 28, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // mắt
   ctx.fillStyle = "black";
   ctx.fillRect(x + 12, y + 25, 5, 5);
   ctx.fillRect(x + 23, y + 25, 5, 5);
 
-  // tay
   ctx.strokeStyle = "white";
   ctx.lineWidth = 4;
-  ctx.beginPath();
 
+  ctx.beginPath();
   ctx.moveTo(x + 5, y + 30);
   ctx.lineTo(x - 10 + swing, y + 35);
 
   ctx.moveTo(x + 35, y + 30);
   ctx.lineTo(x + 50 - swing, y + 35);
-
   ctx.stroke();
 
-  // chân
   ctx.beginPath();
   ctx.moveTo(x + 15, y + 58);
   ctx.lineTo(x + 10 + swing, y + 75);
 
   ctx.moveTo(x + 25, y + 58);
   ctx.lineTo(x + 30 - swing, y + 75);
-
   ctx.stroke();
 }
 
@@ -172,7 +180,13 @@ function draw() {
 
   // nền
   ctx.fillStyle = "#444";
-  ctx.fillRect(-cameraX, ground, mapWidth, 150);
+  ctx.fillRect(-cameraX, ground, mapWidth, 200);
+
+  // platform
+  ctx.fillStyle = "brown";
+  platforms.forEach(p => {
+    ctx.fillRect(p.x - cameraX, p.y, p.w, p.h);
+  });
 
   drawPlayer();
 
@@ -180,24 +194,27 @@ function draw() {
   enemies.forEach(e => {
     let x = e.x - cameraX;
     ctx.fillStyle = "green";
-    ctx.fillRect(x, ground - 50, 40, 50);
+    ctx.fillRect(x, e.y, 40, 50);
 
     ctx.fillStyle = "red";
-    ctx.fillRect(x, ground - 60, e.hp, 5);
+    ctx.fillRect(x, e.y - 10, e.hp, 5);
   });
 
-  // đạn
-  ctx.fillStyle = "yellow";
-  bullets.forEach(b => {
-    ctx.fillRect(b.x - cameraX, b.y, 10, 5);
-  });
-
-  // máu
+  // UI
   ctx.fillStyle = "red";
   ctx.fillRect(20, 20, player.hp * 2, 10);
+
+  // TEXT (3s)
+  if (Date.now() < startTime + 3000) {
+    ctx.fillStyle = "white";
+    ctx.font = "20px Arial";
+    ctx.fillText("J: Đấm | K: Đá", 20, 60);
+  }
 }
 
-// ===== LOOP =====
+let startTime = Date.now();
+
+// LOOP
 function loop() {
   update();
   draw();
