@@ -4,21 +4,22 @@ const ctx = canvas.getContext("2d");
 canvas.width = 1000;
 canvas.height = 500;
 
-// ===== PLAYER =====
+// ===== PLAYER (QUẢ TRỨNG) =====
 let player = {
   x: 100,
-  y: 300,
+  y: 280,
   w: 40,
-  h: 50,
+  h: 55,
   speed: 4,
   hp: 100,
-  attacking: false
+  attacking: false,
+  dir: 1 // hướng
 };
 
-// ===== ENEMY =====
+// ===== ENEMY (QUÁI) =====
 let enemies = [
-  { x: 500, y: 300, w: 40, h: 50, hp: 50 },
-  { x: 800, y: 300, w: 40, h: 50, hp: 50 }
+  { x: 500, y: 300, w: 40, h: 50, hp: 50, dir: -1 },
+  { x: 800, y: 300, w: 40, h: 50, hp: 50, dir: 1 }
 ];
 
 // ===== INPUT =====
@@ -34,16 +35,27 @@ document.addEventListener("keyup", e => {
 
 // ===== UPDATE =====
 function update() {
-  if (keys["a"]) player.x -= player.speed;
-  if (keys["d"]) player.x += player.speed;
+  if (keys["a"]) {
+    player.x -= player.speed;
+    player.dir = -1;
+  }
+  if (keys["d"]) {
+    player.x += player.speed;
+    player.dir = 1;
+  }
   if (keys["w"]) player.y -= player.speed;
   if (keys["s"]) player.y += player.speed;
 
   // giới hạn map
-  if (player.x < 0) player.x = 0;
-  if (player.x > canvas.width - player.w) player.x = canvas.width - player.w;
+  player.x = Math.max(0, Math.min(canvas.width - player.w, player.x));
 
-  // đánh quái
+  // quái di chuyển qua lại
+  enemies.forEach(e => {
+    e.x += e.dir * 1.5;
+    if (e.x < 400 || e.x > 900) e.dir *= -1;
+  });
+
+  // đánh
   if (player.attacking) {
     enemies.forEach(e => {
       if (
@@ -57,47 +69,80 @@ function update() {
     });
   }
 
-  // xóa quái chết
   enemies = enemies.filter(e => e.hp > 0);
+}
+
+// ===== DRAW PLAYER (QUẢ TRỨNG) =====
+function drawPlayer() {
+  // thân trứng
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  ctx.ellipse(player.x + 20, player.y + 25, 18, 25, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // bóng
+  ctx.fillStyle = "#ddd";
+  ctx.beginPath();
+  ctx.ellipse(player.x + 25, player.y + 30, 10, 15, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // mắt
+  ctx.fillStyle = "black";
+  ctx.fillRect(player.x + 10, player.y + 20, 5, 5);
+  ctx.fillRect(player.x + 23, player.y + 20, 5, 5);
+
+  // miệng
+  ctx.fillRect(player.x + 16, player.y + 30, 6, 3);
+}
+
+// ===== DRAW ENEMY (QUÁI) =====
+function drawEnemy(e) {
+  // thân
+  ctx.fillStyle = "green";
+  ctx.beginPath();
+  ctx.ellipse(e.x + 20, e.y + 25, 20, 25, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // mắt đỏ
+  ctx.fillStyle = "red";
+  ctx.fillRect(e.x + 10, e.y + 18, 5, 5);
+  ctx.fillRect(e.x + 25, e.y + 18, 5, 5);
+
+  // sừng
+  ctx.fillStyle = "darkgreen";
+  ctx.fillRect(e.x + 5, e.y, 8, 10);
+  ctx.fillRect(e.x + 27, e.y, 8, 10);
+
+  // máu
+  ctx.fillStyle = "red";
+  ctx.fillRect(e.x, e.y - 10, e.hp, 5);
 }
 
 // ===== DRAW =====
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // nền
-  ctx.fillStyle = "#333";
+  // nền đất
+  ctx.fillStyle = "#444";
   ctx.fillRect(0, 350, canvas.width, 150);
 
-  // player (quả trứng)
-  ctx.fillStyle = "white";
-  ctx.beginPath();
-  ctx.ellipse(player.x + 20, player.y + 25, 20, 25, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // player
+  drawPlayer();
 
-  // mắt
-  ctx.fillStyle = "black";
-  ctx.fillRect(player.x + 12, player.y + 20, 5, 5);
-  ctx.fillRect(player.x + 23, player.y + 20, 5, 5);
+  // quái
+  enemies.forEach(e => drawEnemy(e));
 
-  // máu player
+  // thanh máu player
   ctx.fillStyle = "red";
   ctx.fillRect(20, 20, player.hp * 2, 10);
 
-  // enemy
-  enemies.forEach(e => {
-    ctx.fillStyle = "green";
-    ctx.fillRect(e.x, e.y, e.w, e.h);
-
-    // máu quái
-    ctx.fillStyle = "red";
-    ctx.fillRect(e.x, e.y - 10, e.hp, 5);
-  });
-
-  // đánh
+  // hiệu ứng đánh
   if (player.attacking) {
     ctx.fillStyle = "yellow";
-    ctx.fillRect(player.x + 40, player.y + 10, 20, 20);
+    if (player.dir === 1)
+      ctx.fillRect(player.x + 40, player.y + 10, 20, 20);
+    else
+      ctx.fillRect(player.x - 20, player.y + 10, 20, 20);
   }
 }
 
